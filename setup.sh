@@ -21,7 +21,7 @@ case " ${ID:-} ${ID_LIKE:-} " in
 esac
 
 command -v curl >/dev/null 2>&1 || fail 'curl is required.'
-base=https://runtimeconditions.github.io/packages
+base=https://runtimeconditions.io/packages
 work=$(mktemp -d)
 changed=0
 ready=0
