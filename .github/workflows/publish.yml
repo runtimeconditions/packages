@@ -2,11 +2,17 @@ name: Publish Linux packages
 
 on:
   repository_dispatch:
-    types: [rc-cli-release-published]
+    types: [rc-cli-release-published, rc-profiler-typescript-release-published]
   workflow_dispatch:
     inputs:
+      package:
+        description: Package that the tag belongs to
+        required: false
+        default: rc-cli
+        type: choice
+        options: [rc-cli, rc-profiler-typescript]
       tag:
-        description: Stable rc-cli release tag to validate; blank rebuilds from current releases
+        description: Stable release tag of that package to validate; blank rebuilds from current releases
         required: false
         type: string
 
@@ -33,6 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.client_payload.tag || inputs.tag }}
+          RELEASE_PACKAGE: ${{ inputs.package || (github.event.action == 'rc-profiler-typescript-release-published' && 'rc-profiler-typescript') || 'rc-cli' }}
           SIGNING_KEY: ${{ secrets.PACKAGE_SIGNING_PRIVATE_KEY }}
           SIGNING_FINGERPRINT: ${{ vars.PACKAGE_SIGNING_KEY_ID }}
           GNUPGHOME: ${{ runner.temp }}/package-signing
@@ -41,7 +48,7 @@ jobs:
           test -n "$SIGNING_FINGERPRINT" || { echo "Missing PACKAGE_SIGNING_KEY_ID variable" >&2; exit 1; }
           install -d -m 0700 "$GNUPGHOME"
           printf '%s' "$SIGNING_KEY" | gpg --batch --import
-          python3 scripts/build_repository.py --tag "$RELEASE_TAG" \
+          python3 scripts/build_repository.py --package "$RELEASE_PACKAGE" --tag "$RELEASE_TAG" \
             --key "$SIGNING_FINGERPRINT" --output "$RUNNER_TEMP/site"
       - name: Upload repository site
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
