@@ -33,6 +33,9 @@ class AssetNameTests(unittest.TestCase):
             "rc-cli_1.2.3-1_amd64.deb", "rc-cli-1.2.3-1.x86_64.rpm",
             "rc-cli_1.2.3-1_arm64.deb", "rc-cli-1.2.3-1.aarch64.rpm"])
         self.assertEqual(build.assets("rc-profiler-typescript", "v0.3.0")[0], "rc-profiler-typescript_0.3.0-1_amd64.deb")
+        self.assertEqual(build.assets("rc-profiler-java", "v0.1.0"), [
+            "rc-profiler-java_0.1.0-1_amd64.deb", "rc-profiler-java-0.1.0-1.x86_64.rpm",
+            "rc-profiler-java_0.1.0-1_arm64.deb", "rc-profiler-java-0.1.0-1.aarch64.rpm"])
 
 
 class ReleaseSelectionTests(unittest.TestCase):
@@ -66,8 +69,8 @@ class ReleaseSelectionTests(unittest.TestCase):
 
 
 class SelectReleasesTests(unittest.TestCase):
-    def both(self, cli, typescript):
-        return github(**{"rc-cli": cli, "rc-profiler-typescript": typescript})
+    def both(self, cli, typescript, java=()):
+        return github(**{"rc-cli": cli, "rc-profiler-typescript": typescript, "rc-profiler-java": list(java)})
 
     def test_the_repository_is_built_with_rc_cli_alone_until_the_other_package_has_packages(self):
         with self.both([release("rc-cli", "v0.2.0")], [release("rc-profiler-typescript", "v0.2.0", packaged=False)]):
@@ -79,7 +82,7 @@ class SelectReleasesTests(unittest.TestCase):
         with self.both([release("rc-cli", "v0.2.0")], [release("rc-profiler-typescript", "v0.3.0")]):
             selected = build.select_releases("rc-cli", "")
         self.assertEqual({name: [r["tag_name"] for r in chosen] for name, chosen in selected.items()},
-                         {"rc-cli": ["v0.2.0"], "rc-profiler-typescript": ["v0.3.0"]})
+                         {"rc-cli": ["v0.2.0"], "rc-profiler-typescript": ["v0.3.0"], "rc-profiler-java": []})
 
     def test_the_tag_is_checked_against_its_own_package_only(self):
         with self.both([release("rc-cli", "v0.2.0")], [release("rc-profiler-typescript", "v0.3.0"), release("rc-profiler-typescript", "v0.2.0", packaged=False)]):
@@ -87,6 +90,29 @@ class SelectReleasesTests(unittest.TestCase):
             self.assertEqual([r["tag_name"] for r in selected["rc-profiler-typescript"]], ["v0.3.0"])
             with self.assertRaisesRegex(ValueError, "trigger release must be stable and contain all four Linux packages of rc-profiler-typescript"):
                 build.select_releases("rc-profiler-typescript", "v0.2.0")
+
+    def test_the_java_profiler_is_included_once_it_has_packages_and_left_out_until_then(self):
+        with self.both([release("rc-cli", "v0.2.0")], [], [release("rc-profiler-java", "v0.1.0", packaged=False)]):
+            self.assertEqual(build.select_releases("rc-cli", "")["rc-profiler-java"], [])
+        with self.both([release("rc-cli", "v0.2.0")], [release("rc-profiler-typescript", "v0.3.0")], [release("rc-profiler-java", "v0.1.0")]):
+            selected = build.select_releases("rc-profiler-java", "v0.1.0")
+        self.assertEqual({name: [r["tag_name"] for r in chosen] for name, chosen in selected.items()},
+                         {"rc-cli": ["v0.2.0"], "rc-profiler-typescript": ["v0.3.0"], "rc-profiler-java": ["v0.1.0"]})
+
+    def test_a_java_tag_must_have_all_four_packages_and_be_stable(self):
+        items = [release("rc-profiler-java", "v0.1.0"), release("rc-profiler-java", "v0.2.0", packaged=False),
+                 release("rc-profiler-java", "v0.3.0-rc.1", prerelease=True)]
+        with self.both([release("rc-cli", "v0.2.0")], [], items):
+            with self.assertRaisesRegex(ValueError, "trigger release must be stable and contain all four Linux packages of rc-profiler-java"):
+                build.select_releases("rc-profiler-java", "v0.2.0")
+            with self.assertRaisesRegex(ValueError, "vMAJOR.MINOR.PATCH"):
+                build.select_releases("rc-profiler-java", "v0.3.0-rc.1")
+
+    def test_the_workflow_listens_for_every_package_and_offers_it_by_hand(self):
+        workflow = (Path(__file__).resolve().parent.parent / ".github/workflows/publish.yml").read_text()
+        for name in build.PACKAGES:
+            self.assertIn(f"{name}-release-published", workflow, name)
+            self.assertIn(name, workflow.split("options:")[1].split("\n")[0], name)
 
     def test_rc_cli_is_required(self):
         with self.both([release("rc-cli", "v0.2.0", packaged=False)], [release("rc-profiler-typescript", "v0.3.0")]):
