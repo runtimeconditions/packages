@@ -18,6 +18,7 @@ import urllib.request
 PACKAGES = {
     "rc-cli": "runtimeconditions/rc-cli",
     "rc-profiler-typescript": "runtimeconditions/ts-rc-profiler",
+    "rc-profiler-java": "runtimeconditions/java-rc-profiler",
 }
 # The repository is not built without a release of these. Another package is left out
 # until one of its releases has packages attached.

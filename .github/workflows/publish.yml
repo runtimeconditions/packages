@@ -2,7 +2,7 @@ name: Publish Linux packages
 
 on:
   repository_dispatch:
-    types: [rc-cli-release-published, rc-profiler-typescript-release-published]
+    types: [rc-cli-release-published, rc-profiler-typescript-release-published, rc-profiler-java-release-published]
   workflow_dispatch:
     inputs:
       package:
@@ -10,7 +10,7 @@ on:
         required: false
         default: rc-cli
         type: choice
-        options: [rc-cli, rc-profiler-typescript]
+        options: [rc-cli, rc-profiler-typescript, rc-profiler-java]
       tag:
         description: Stable release tag of that package to validate; blank rebuilds from current releases
         required: false
@@ -39,7 +39,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.client_payload.tag || inputs.tag }}
-          RELEASE_PACKAGE: ${{ inputs.package || (github.event.action == 'rc-profiler-typescript-release-published' && 'rc-profiler-typescript') || 'rc-cli' }}
+          RELEASE_PACKAGE: ${{ inputs.package || (github.event.action == 'rc-profiler-typescript-release-published' && 'rc-profiler-typescript') || (github.event.action == 'rc-profiler-java-release-published' && 'rc-profiler-java') || 'rc-cli' }}
           SIGNING_KEY: ${{ secrets.PACKAGE_SIGNING_PRIVATE_KEY }}
           SIGNING_FINGERPRINT: ${{ vars.PACKAGE_SIGNING_KEY_ID }}
           GNUPGHOME: ${{ runner.temp }}/package-signing
